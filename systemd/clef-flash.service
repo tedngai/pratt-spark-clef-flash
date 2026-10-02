@@ -1,0 +1,23 @@
+# Clef-Flash systemd unit template.
+# install_systemd.sh substitutes __PROJECT_DIR__ and __DOCKER_BIN__ and installs this
+# to /etc/systemd/system/clef-flash.service.
+[Unit]
+Description=Clef-Flash decision model (Docker Compose)
+Documentation=file://__PROJECT_DIR__/README.md
+Requires=docker.service
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=__PROJECT_DIR__
+ExecStart=__DOCKER_BIN__ compose --env-file __PROJECT_DIR__/clef.env -f __PROJECT_DIR__/compose.yaml up -d --remove-orphans
+ExecStop=__DOCKER_BIN__ compose --env-file __PROJECT_DIR__/clef.env -f __PROJECT_DIR__/compose.yaml down
+ExecReload=__DOCKER_BIN__ compose --env-file __PROJECT_DIR__/clef.env -f __PROJECT_DIR__/compose.yaml restart
+TimeoutStartSec=0
+TimeoutStopSec=180
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

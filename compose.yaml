@@ -1,0 +1,45 @@
+name: clef-flash
+
+services:
+  clef-flash:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-vllm/vllm-openai@sha256:9fe761ad1e8258a5e8f1c28243b1567c19b0a78e3a909c72611fdd1771f0f966}
+        TRANSFORMERS_VERSION: ${TRANSFORMERS_VERSION:-5.10.2}
+        INSTALL_KERNELS: ${INSTALL_KERNELS:-1}
+        CUDA_ARCH_LIST: ${CUDA_ARCH_LIST:-12.1}
+        MAX_JOBS: ${MAX_JOBS:-8}
+    image: ${CLEF_IMAGE:-clef-flash:latest}
+    container_name: ${CONTAINER_NAME:-clef-flash}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    gpus: all
+    ipc: host
+    shm_size: "16gb"
+    ports:
+      - "${PORT:-8001}:${PORT:-8001}"
+    volumes:
+      - ${HF_HOME_HOST:-./data/huggingface}:/root/.cache/huggingface
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      MODEL_ID: ${MODEL_ID:-Cloudflare/clef-flash}
+      SERVED_MODEL_NAME: ${SERVED_MODEL_NAME:-clef-flash}
+      PORT: ${PORT:-8001}
+      CLEF_DEVICE: ${CLEF_DEVICE:-cuda}
+      CLEF_MAX_LENGTH: ${CLEF_MAX_LENGTH:-16384}
+      CLEF_WARMUP: ${CLEF_WARMUP:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      HF_HUB_ENABLE_HF_TRANSFER: ${HF_HUB_ENABLE_HF_TRANSFER:-1}
+      HF_XET_HIGH_PERFORMANCE: ${HF_XET_HIGH_PERFORMANCE:-1}
+      HF_HUB_DISABLE_XET: ${HF_HUB_DISABLE_XET:-}
+      HF_TOKEN: ${HF_TOKEN:-}
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    healthcheck:
+      test: ["CMD", "python", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 600s

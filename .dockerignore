@@ -1,0 +1,8 @@
+data/
+examples/
+tests/
+systemd/
+*.md
+*.env
+compose.yaml
+.git/
