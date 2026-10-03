@@ -13,10 +13,12 @@ Additions over the stock server (all behavior-preserving when load is serial):
 5. Optional API key (CLEF_API_KEY env), body-size guard, image count guard.
 
 Env vars:
-  QUEUE_MAX       default 64     # max queued requests before 429
-  BATCH_MAX       default 8      # max records per forward pass
-  BATCH_WAIT_MS   default 15     # gather window before running a partial batch
-  CLEF_API_KEY    default unset  # when set, require "Authorization: Bearer <key>"
+  QUEUE_MAX            default 64    # max queued requests before 429
+  BATCH_MAX            default 8     # max records per forward pass
+  BATCH_WAIT_MS        default 15    # gather window before running a partial batch
+  SOLO_TOKEN_LIMIT     default 512   # estimated tokens above which a request runs solo
+  BATCH_TOKEN_LIMIT    default 2048  # cap on total estimated tokens per gathered batch
+  CLEF_API_KEY         default unset # when set, require "Authorization: Bearer <key>"
 
 Deploy: copy next to server.py on the DGX host, adjust compose/systemd entrypoint
 (same uvicorn invocation, single worker — keep workers=1 for the single GPU).
@@ -59,10 +61,31 @@ LOG_LEVEL = os.environ.get("LOG_LEVEL", "info")
 QUEUE_MAX = int(os.environ.get("QUEUE_MAX", "64"))
 BATCH_MAX = int(os.environ.get("BATCH_MAX", "8"))
 BATCH_WAIT_MS = float(os.environ.get("BATCH_WAIT_MS", "15"))
+# Batch-safety limits. On GB10/sm_121 a batch-8 forward at ~1k-token states
+# triggered a multi-minute Triton autotune that starved the whole machine
+# (GIL-bound compile threads blocked uvicorn AND sshd). Long states therefore
+# run solo; only short-state requests are batched, with a total-token cap.
+SOLO_TOKEN_LIMIT = int(os.environ.get("SOLO_TOKEN_LIMIT", "512"))
+BATCH_TOKEN_LIMIT = int(os.environ.get("BATCH_TOKEN_LIMIT", "2048"))
 API_KEY = os.environ.get("CLEF_API_KEY")  # unset = no auth (LAN)
 
 MAX_BODY_BYTES = 13 * 1024 * 1024  # mirrors Cloudflare's Workers AI limit
 MAX_IMAGES = 4
+
+# ~200-token warmup payload: close to typical short-decision requests, so the
+# per-(batch, seqlen) Triton autotune covers the shapes real traffic hits.
+WARMUP_STATE = (
+    "Warmup request for kernel tuning. The monitoring dashboard flagged elevated "
+    "error rates on the checkout service and the payment provider reported timeouts. "
+    "Customer complaints arrived via support chat mentioning duplicate charges, and "
+    "the on-call engineer paged the payments team at 09:14 UTC to investigate the "
+    "failing transactions. Reference incident 4471; severity pending triage. "
+    * 2
+)
+
+# Triton autotune/compile threads are GIL-heavy; a smaller switch interval
+# keeps the asyncio event loop responsive while compilation runs.
+sys.setswitchinterval(0.001)
 
 logging.basicConfig(level=LOG_LEVEL.upper(), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("clef.hardened")
@@ -157,6 +180,7 @@ class BatchEngine:
         self.queue: queue_mod.Queue[Job] = queue_mod.Queue(maxsize=QUEUE_MAX)
         self.stats = {"requests": 0, "batches": 0, "errors": 0, "shed": 0, "batch_sizes": []}
         self._latencies: list[float] = []
+        self._carry: Job | None = None  # popped job that didn't fit the batch budget
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._loop, name="inference", daemon=True)
         self._thread.start()
@@ -173,21 +197,47 @@ class BatchEngine:
             )
         return job
 
+    def _est_tokens(self, request: dict[str, Any]) -> float:
+        """Rough token estimate for batch-safety decisions (~3.5 chars/token)."""
+        if request.get("images") or request.get("videos"):
+            return float("inf")  # vision batching untested — always solo
+        state = request.get("state")
+        size = len(state) if isinstance(state, str) else len(json.dumps(state, default=str))
+        size += len(json.dumps(request.get("questions") or {}, default=str))
+        return size / 3.5
+
     def _loop(self) -> None:
         while not self._stop.is_set():
-            try:
-                first = self.queue.get(timeout=0.5)
-            except queue_mod.Empty:
-                continue
+            if self._carry is not None:
+                first, self._carry = self._carry, None
+            else:
+                try:
+                    first = self.queue.get(timeout=0.5)
+                except queue_mod.Empty:
+                    continue
             batch = [first]
+            first_est = self._est_tokens(first.request)
+            if first_est > SOLO_TOKEN_LIMIT:
+                # long state (or media): run solo, skip the gather wait entirely —
+                # large-batch x long-sequence shapes are the known autotune hazard
+                self._run_batch(batch)
+                continue
+            budget = BATCH_TOKEN_LIMIT - first_est
             deadline = time.perf_counter() + BATCH_WAIT_MS / 1000
             while len(batch) < BATCH_MAX:
                 remaining = deadline - time.perf_counter()
                 if remaining <= 0:
                     break
                 try:
-                    batch.append(self.queue.get(timeout=remaining))
+                    nxt = self.queue.get(timeout=remaining)
                 except queue_mod.Empty:
+                    break
+                est = self._est_tokens(nxt.request)
+                if est <= budget:
+                    batch.append(nxt)
+                    budget -= est
+                else:
+                    self._carry = nxt  # run as the first job of the next batch
                     break
             self._run_batch(batch)
 
@@ -264,7 +314,7 @@ async def lifespan(_: FastAPI):
             from joint_schema_model import systemone  # noqa: PLC0415
             systemone(model, processor, {
                 "model": SERVED_MODEL_NAME,
-                "state": {"warmup": True},
+                "state": WARMUP_STATE,
                 "questions": {"ready": {"type": "noul", "instructions": "Is this a warmup request?"}},
             }, max_length=MAX_LENGTH)
             log.info("single-request warmup complete")
@@ -276,7 +326,7 @@ async def lifespan(_: FastAPI):
         if WARMUP:
             warmup_request = {
                 "model": SERVED_MODEL_NAME,
-                "state": {"warmup": True},
+                "state": WARMUP_STATE,
                 "questions": {"ready": {"type": "noul", "instructions": "Is this a warmup request?"}},
             }
             for size in [s for s in (1, 2, 4, BATCH_MAX) if s <= BATCH_MAX]:

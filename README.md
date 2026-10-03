@@ -223,6 +223,17 @@ build differs, override `BASE_IMAGE` with an appropriate image.
 4. **`/stats`** — queue depth, average batch size, forward-pass p50/p95.
 5. **Guards** — optional `CLEF_API_KEY` auth on POST endpoints, 13 MiB body
    cap, image count/pixel caps.
+6. **Batch-safety limits** — requests with media, or estimated above
+   `SOLO_TOKEN_LIMIT` (~512 tokens), always run solo; gathered batches are
+   capped at `BATCH_TOKEN_LIMIT` (2048) total tokens. Rationale: a
+   batch-8 forward at ~1k-token states triggered a multi-minute Triton
+   autotune on GB10 whose GIL-bound compile threads starved uvicorn and
+   sshd (full machine wedge, observed 2026-10-02). Long states are
+   compute-bound anyway, so solo execution costs little throughput.
+7. **Known gap** — Docker does not restart unhealthy containers. If the
+   GPU wedges, the compose healthcheck marks it unhealthy but the
+   container stays up; add an autoheal sidecar or a systemd timer that
+   restarts on `unhealthy` for unattended production.
 
 Configuration lives in `clef.env` (`CLEF_SERVER_FILE`, `QUEUE_MAX`,
 `BATCH_MAX`, `BATCH_WAIT_MS`, `CLEF_API_KEY`). Set

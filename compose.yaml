@@ -38,6 +38,8 @@ services:
       QUEUE_MAX: ${QUEUE_MAX:-64}
       BATCH_MAX: ${BATCH_MAX:-8}
       BATCH_WAIT_MS: ${BATCH_WAIT_MS:-10}
+      SOLO_TOKEN_LIMIT: ${SOLO_TOKEN_LIMIT:-512}
+      BATCH_TOKEN_LIMIT: ${BATCH_TOKEN_LIMIT:-2048}
     ulimits:
       memlock: -1
       stack: 67108864
