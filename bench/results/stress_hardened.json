@@ -1,0 +1,59 @@
+{
+  "label": "hardened",
+  "base_url": "http://192.168.1.242:8001",
+  "baseline": {
+    "n": 15,
+    "p50_ms": 141.5,
+    "p95_ms": 150.6,
+    "throughput_rps": 7.12
+  },
+  "concurrency": {
+    "c=4": {
+      "n": 32,
+      "ok": 32,
+      "errors": null,
+      "wall_s": 2.5,
+      "throughput_rps": 12.81,
+      "client_p50_ms": 293.8,
+      "client_p95_ms": 526.0
+    },
+    "c=8": {
+      "n": 32,
+      "ok": 32,
+      "errors": null,
+      "wall_s": 2.5,
+      "throughput_rps": 12.95,
+      "client_p50_ms": 615.4,
+      "client_p95_ms": 921.7
+    },
+    "c=16": {
+      "n": 32,
+      "ok": 32,
+      "errors": null,
+      "wall_s": 2.5,
+      "throughput_rps": 13.01,
+      "client_p50_ms": 1230.6,
+      "client_p95_ms": 1236.0
+    }
+  },
+  "burst": {
+    "n": 100,
+    "wall_s": 5.6,
+    "ok": 72,
+    "errors": {
+      "429": 28
+    },
+    "ok_p50_ms": 3083.9,
+    "ok_p95_ms": 5532.7,
+    "ok_max_ms": 5537.5,
+    "survives_after": true,
+    "post_burst_latency_ms": 140.9
+  },
+  "correctness": {
+    "n": 12,
+    "missing": 0,
+    "choice_mismatches": 0,
+    "max_prob_delta": 0.0017,
+    "note": "bf16 batch-composition jitter; decisions must match, probabilities <3e-3"
+  }
+}

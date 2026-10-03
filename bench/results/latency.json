@@ -1,0 +1,83 @@
+{
+  "profile_a_state_size": {
+    "state~100tok": {
+      "n": 12,
+      "client_p50_ms": 186.9,
+      "client_p95_ms": 189.4,
+      "server_p50_ms": 148.7,
+      "server_p95_ms": 149.5
+    },
+    "state~1000tok": {
+      "n": 12,
+      "client_p50_ms": 453.6,
+      "client_p95_ms": 459.5,
+      "server_p50_ms": 431.0,
+      "server_p95_ms": 434.3
+    },
+    "state~4000tok": {
+      "n": 12,
+      "client_p50_ms": 1551.9,
+      "client_p95_ms": 2331.8,
+      "server_p50_ms": 1530.6,
+      "server_p95_ms": 2310.9
+    },
+    "state~8000tok": {
+      "n": 12,
+      "client_p50_ms": 2935.8,
+      "client_p95_ms": 3072.1,
+      "server_p50_ms": 2913.9,
+      "server_p95_ms": 2986.7
+    }
+  },
+  "profile_b_question_count": {
+    "1q": {
+      "n": 12,
+      "client_p50_ms": 203.0,
+      "server_p50_ms": 173.7
+    },
+    "8q": {
+      "n": 12,
+      "client_p50_ms": 342.9,
+      "server_p50_ms": 318.1
+    },
+    "32q": {
+      "n": 12,
+      "client_p50_ms": 997.2,
+      "server_p50_ms": 975.7
+    },
+    "64q": {
+      "n": 12,
+      "client_p50_ms": 1743.6,
+      "server_p50_ms": 1720.4
+    }
+  },
+  "profile_c_image": {
+    "image_1024": {
+      "n": 8,
+      "client_p50_ms": 542.8,
+      "server_p50_ms": 510.5
+    }
+  },
+  "profile_d_concurrency": {
+    "c=1": {
+      "n": 10,
+      "wall_s": 3.4,
+      "throughput_rps": 2.94
+    },
+    "c=2": {
+      "n": 20,
+      "wall_s": 8.1,
+      "throughput_rps": 2.47
+    },
+    "c=4": {
+      "n": 40,
+      "wall_s": 12.8,
+      "throughput_rps": 3.13
+    },
+    "c=8": {
+      "n": 80,
+      "wall_s": 25.6,
+      "throughput_rps": 3.13
+    }
+  }
+}
