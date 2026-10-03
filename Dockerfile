@@ -56,6 +56,7 @@ ENV PATH=/opt/clef-venv/bin:$PATH \
 
 WORKDIR /app
 COPY server.py /app/server.py
+COPY server_hardened.py /app/server_hardened.py
 COPY healthcheck.py /app/healthcheck.py
 
 EXPOSE 8001

@@ -201,3 +201,31 @@ build differs, override `BASE_IMAGE` with an appropriate image.
 - `transformers` and the kernels live in an isolated venv (`/opt/clef-venv`,
   `--system-site-packages`) so the base image's vLLM environment is untouched; torch is
   inherited from the base.
+
+
+## Hardened server (micro-batching + bounded queue)
+
+`server_hardened.py` is a drop-in replacement for `server.py` that adds:
+
+1. **Dedicated inference thread** — the GPU is owned by one thread, eliminating
+   the intermittent HTTP 500s the stock server produces under concurrent load
+   (concurrent callers into the shared model are a data race).
+2. **Dynamic micro-batching** — requests arriving within `BATCH_WAIT_MS` are
+   collated (via `collate_records`) into a single forward pass. A 9B bf16
+   backbone costs ~66 ms/forward just in weight reads, so batching amortizes
+   the dominant cost. Measured on the GB10 (3-option schema, BATCH_MAX=8):
+   **7.1 -> 13.0 req/s (~1.8x) aggregate throughput**; the ceiling is
+   per-record compute, so gains grow for shorter states and larger
+   `BATCH_MAX`.
+3. **Bounded queue** — beyond `QUEUE_MAX` waiting requests the server sheds
+   load with `429` + `Retry-After` instead of letting latency grow unbounded
+   (measured: a 100-request burst admits 72, sheds 28 with `429`, no 500s).
+4. **`/stats`** — queue depth, average batch size, forward-pass p50/p95.
+5. **Guards** — optional `CLEF_API_KEY` auth on POST endpoints, 13 MiB body
+   cap, image count/pixel caps.
+
+Configuration lives in `clef.env` (`CLEF_SERVER_FILE`, `QUEUE_MAX`,
+`BATCH_MAX`, `BATCH_WAIT_MS`, `CLEF_API_KEY`). Set
+`CLEF_SERVER_FILE=server` and restart to revert to the stock server.
+`BATCH_WAIT_MS` is a pure latency tax when idle (10 ms default); lower it for
+latency-critical deployments or raise `BATCH_MAX` for throughput-critical ones.

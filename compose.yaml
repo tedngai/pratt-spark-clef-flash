@@ -34,9 +34,14 @@ services:
       HF_XET_HIGH_PERFORMANCE: ${HF_XET_HIGH_PERFORMANCE:-1}
       HF_HUB_DISABLE_XET: ${HF_HUB_DISABLE_XET:-}
       HF_TOKEN: ${HF_TOKEN:-}
+      CLEF_API_KEY: ${CLEF_API_KEY:-}
+      QUEUE_MAX: ${QUEUE_MAX:-64}
+      BATCH_MAX: ${BATCH_MAX:-8}
+      BATCH_WAIT_MS: ${BATCH_WAIT_MS:-10}
     ulimits:
       memlock: -1
       stack: 67108864
+    entrypoint: ["python", "/app/${CLEF_SERVER_FILE:-server}.py"]
     healthcheck:
       test: ["CMD", "python", "/app/healthcheck.py"]
       interval: 30s
