@@ -1,0 +1,30 @@
+{
+  "exact": {
+    "time": {
+      "p50": 4401.6,
+      "mean": 4402.2
+    }
+  },
+  "tree": {
+    "time": {
+      "p50": 4407.9,
+      "mean": 4408.6
+    },
+    "speedup_vs_exact": 1.0,
+    "decision_flips": 0,
+    "max_prob_delta": 0.0
+  },
+  "cache": {
+    "time": {
+      "p50": 4408.8,
+      "mean": 4410.1
+    },
+    "speedup_vs_exact": 1.0,
+    "decision_flips": 0,
+    "max_prob_delta": 0.0
+  },
+  "notes": {
+    "state_repeat_tokens_approx": "state is 20 repeats of ~110-token paragraph (~2200 tokens)",
+    "questions": 8
+  }
+}

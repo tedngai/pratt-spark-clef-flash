@@ -1,0 +1,16 @@
+{
+  "short_state": {
+    "questions": 8,
+    "shared": false,
+    "reason": "transformers 5.18.0 is not verified"
+  },
+  "long_state": {
+    "questions": 8,
+    "shared": false,
+    "reason": "transformers 5.18.0 is not verified"
+  },
+  "transformers_version": "5.18.0",
+  "backbone_model_type": "qwen3_5_text",
+  "_supported_source": "def _supported(backend: Any) -> str | None:\n    \"\"\"Why this backend cannot share a prefix; None when it can.\"\"\"\n    import transformers\n\n    if not transformers.__version__.startswith(TESTED_TRANSFORMERS):\n        return f\"transformers {transformers.__version__} is not verified\"\n    config = _core(backend.model.backbone).config\n    if getattr(config, \"model_type\", None) not in SUPPORTED_MODEL_TYPES:\n        return f\"backbone {getattr(config, 'model_type', None)} is not supported\"\n    if getattr(config, \"_attn_implementation\", None) != \"sdpa\":\n        return \"needs SDPA attention\"\n    if not set(getattr(config, \"layer_types\", None) or [\"full_attention\"]) <= set(\n        LAYER_TYPES\n    ):\n        return \"needs full / linear attention layers only\"\n    return None\n",
+  "_auto_shared_tokens_source": "def auto_shared_tokens(config: Any, graphs: bool = False) -> int:\n    \"\"\"Prefix tokens a request must save before sharing pays off on this backbone.\n\n    Sharing adds launches (a packed row, two attention or gated-delta kernels\n    per layer) that a small backbone recovers only on larger requests, later\n    still when the exact path replays HIP graphs (``graphs``). The values are\n    the break-evens measured on one MI325X (the 1-128 question benchmark and\n    Index multi-question requests).\n    \"\"\"\n    hidden = getattr(config, \"hidden_size\", 0)\n    if \"linear_attention\" not in set(getattr(config, \"layer_types\", None) or ()):\n        return 3072 if graphs else 1024\n    if hidden <= 1024:\n        return 6144 if graphs else 2048\n    if hidden <= 2048:\n        return 3072 if graphs else 1536\n    if hidden <= 3072:\n        return 1536 if graphs else 1024\n    return 512\n"
+}
